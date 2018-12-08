@@ -7,6 +7,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EsiLibrary", "EsiLibrary\Es
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EsiLibrary.Tests", "EsiLibrary.Tests\EsiLibrary.Tests.csproj", "{B5DB99E1-EE3C-4C56-8B2D-8D996AF4BEBC}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EsiLibrary.IntegrationTests", "EsiLibrary.IntegrationTests\EsiLibrary.IntegrationTests.csproj", "{05FCA150-8E6F-4C0C-A694-2C25A06D10A0}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -20,7 +22,10 @@ Global
 		{B5DB99E1-EE3C-4C56-8B2D-8D996AF4BEBC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{B5DB99E1-EE3C-4C56-8B2D-8D996AF4BEBC}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{B5DB99E1-EE3C-4C56-8B2D-8D996AF4BEBC}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{B5DB99E1-EE3C-4C56-8B2D-8D996AF4BEBC}.Release|Any CPU.Build.0 = Release|Any CPU
+		{05FCA150-8E6F-4C0C-A694-2C25A06D10A0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{05FCA150-8E6F-4C0C-A694-2C25A06D10A0}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{05FCA150-8E6F-4C0C-A694-2C25A06D10A0}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{05FCA150-8E6F-4C0C-A694-2C25A06D10A0}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

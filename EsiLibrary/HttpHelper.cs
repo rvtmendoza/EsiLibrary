@@ -1,9 +1,9 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using Newtonsoft.Json;
+using System;
+using System.Diagnostics;
 using System.Net;
 using System.Net.Http;
 using System.Threading.Tasks;
-using Newtonsoft.Json;
 
 namespace EsiLibrary
 {
@@ -29,19 +29,16 @@ namespace EsiLibrary
             }
             catch (Exception e)
             {
-                Console.WriteLine(e);
+                Debug.Print(e.Message);
                 return null;
             }
         }
 
-        public static async Task<T> PostData<T>(string uri, HttpClient httpClient, IEnumerable<KeyValuePair<string, string>> postData)
+        public static async Task<T> PostData<T>(string uri, HttpClient httpClient, HttpContent postData)
         {
-            using (var content = new FormUrlEncodedContent(postData))
-            {
-                var response = await httpClient.PostAsync(uri, content);
-
-                return JsonConvert.DeserializeObject<T>((await response.Content.ReadAsStringAsync()));
-            }
+            var response = await httpClient.PostAsync(uri, postData);
+            
+            return JsonConvert.DeserializeObject<T>((await response.Content.ReadAsStringAsync()));
         }
     }
 }

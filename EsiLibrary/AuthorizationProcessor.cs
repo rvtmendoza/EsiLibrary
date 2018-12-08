@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Net.Http;
-using System.Net.Http.Headers;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
@@ -11,10 +10,11 @@ using System.Web;
 
 namespace EsiLibrary
 {
-    public class AuthorizationProcessor
+    public class AuthorizationProcessor : IAuthorizationProcessor
     {
         private readonly string _baseAuthorizationUri = "https://login.eveonline.com/v2/oauth/authorize/";
         private readonly string _baseTokenUri = "https://login.eveonline.com/v2/oauth/token";
+        private readonly string _baseTokenValidationUri = "https://login.eveonline.com/oauth/jwks/";
 
         private string _originalEncodedString;
 
@@ -50,7 +50,7 @@ namespace EsiLibrary
 
             Process.Start(authorizationUri);
 
-            var responseCode = await HttpHelper.GetResponseFromHttpServer(authorizationUri);
+            var responseCode = await HttpHelper.GetResponseFromHttpServer(redirectUri);
 
             return ExtractAuthorizationCode(responseCode, redirectUri, state);
         }
@@ -59,16 +59,17 @@ namespace EsiLibrary
         {
             var httpClient = new HttpClient();
             httpClient.DefaultRequestHeaders.Host = "login.eveonline.com";
+            httpClient.DefaultRequestHeaders.TryAddWithoutValidation("Content-Type", "application/x-www-form-urlencoded");
             
-            var postData = new List<KeyValuePair<string, string>>
+            var postData = new Dictionary<string, string>
             {
-                new KeyValuePair<string, string>("grant_type", "authorization_code"),
-                new KeyValuePair<string, string>("code", authorizationCode),
-                new KeyValuePair<string, string>("client_id", clientId),
-                new KeyValuePair<string, string>("code_verifier", _originalEncodedString)
+                {"grant_type", "authorization_code"},
+                {"code", authorizationCode},
+                {"client_id", clientId},
+                {"code_verifier", _originalEncodedString}
             };
 
-            return await HttpHelper.PostData<Token>(_baseTokenUri, httpClient, postData);
+            return await HttpHelper.PostData<Token>(_baseTokenUri, httpClient, new FormUrlEncodedContent(postData));
         }
 
         private async Task ValidateToken()
@@ -78,12 +79,16 @@ namespace EsiLibrary
 
         private string GetAuthorizationUri(string clientId, string redirectUri, IEnumerable<string> scopes, string state)
         {
-            _originalEncodedString = EncodeString(GenerateRandomString());
+            var random = GenerateRandomString();
+
+            var firstEncodedString = EncodeString(random);
 
             var scopeDelimitedString = GetScopeDelimitedString(scopes);
-            var codeChallenge = EncodeString(HashString(_originalEncodedString));
+            var codeChallenge = EncodeString(HashString(firstEncodedString));
 
-            return
+            _originalEncodedString = firstEncodedString;
+
+            var authorizationUri =
                 $"{_baseAuthorizationUri}?" +
                 $"response_type=code&" +
                 $"redirect_uri={EncodeUri(redirectUri)}&" +
@@ -91,7 +96,9 @@ namespace EsiLibrary
                 $"scope={scopeDelimitedString}&" +
                 $"code_challenge={codeChallenge}&" +
                 $"code_challenge_method=S256&" +
-                $"state={state}";
+                $"state={state}/";
+            
+            return authorizationUri;
         }
 
         private string EncodeUri(string redirectUri)
@@ -138,7 +145,9 @@ namespace EsiLibrary
 
         private string ExtractAuthorizationCode(string responseCode, string redirectUri, string state)
         {
-            return responseCode.Replace($"{redirectUri}?code=", "").Replace($"&state={state}", "");
+            var authorizationCode = responseCode.Replace($"{redirectUri}?code=", "").Replace($"&state={state}%2F", "");
+
+            return authorizationCode;
         }
     }
 }
