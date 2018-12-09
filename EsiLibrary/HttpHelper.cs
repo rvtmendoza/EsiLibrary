@@ -1,5 +1,5 @@
-﻿using Newtonsoft.Json;
-using System;
+﻿using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Net;
 using System.Net.Http;
@@ -34,11 +34,19 @@ namespace EsiLibrary
             }
         }
 
-        public static async Task<T> PostData<T>(string uri, HttpClient httpClient, HttpContent postData)
+        public static async Task<HttpResponseMessage> PostAsync(HttpClient httpClient, Uri requestUri, IEnumerable<KeyValuePair<string, string>> postParams)
         {
-            var response = await httpClient.PostAsync(uri, postData);
-            
-            return JsonConvert.DeserializeObject<T>((await response.Content.ReadAsStringAsync()));
+            try
+            {
+                var response = await httpClient.PostAsync(requestUri, new FormUrlEncodedContent(postParams));
+
+                return response;
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e);
+                throw;
+            }
         }
     }
 }

@@ -1,19 +1,19 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
 using System.Net.Http;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
 using System.Web;
+using Newtonsoft.Json;
 
 namespace EsiLibrary
 {
-    public class AuthorizationProcessor : IAuthorizationProcessor
+    public class PkceAuthorizationProcessor : IAuthorizationProcessor
     {
         private readonly string _baseAuthorizationUri = "https://login.eveonline.com/v2/oauth/authorize/";
-        private readonly string _baseTokenUri = "https://login.eveonline.com/v2/oauth/token";
+        private readonly Uri _baseTokenUri = new Uri("https://login.eveonline.com/v2/oauth/token/");
         private readonly string _baseTokenValidationUri = "https://login.eveonline.com/oauth/jwks/";
 
         private string _originalEncodedString;
@@ -58,10 +58,11 @@ namespace EsiLibrary
         private async Task<Token> GetToken(string clientId, string authorizationCode)
         {
             var httpClient = new HttpClient();
-            httpClient.DefaultRequestHeaders.Host = "login.eveonline.com";
+            httpClient.DefaultRequestHeaders.Clear();
+            httpClient.DefaultRequestHeaders.TryAddWithoutValidation("Host", "login.eveonline.com");
             httpClient.DefaultRequestHeaders.TryAddWithoutValidation("Content-Type", "application/x-www-form-urlencoded");
-            
-            var postData = new Dictionary<string, string>
+
+            var postParams = new Dictionary<string, string>
             {
                 {"grant_type", "authorization_code"},
                 {"code", authorizationCode},
@@ -69,7 +70,9 @@ namespace EsiLibrary
                 {"code_verifier", _originalEncodedString}
             };
 
-            return await HttpHelper.PostData<Token>(_baseTokenUri, httpClient, new FormUrlEncodedContent(postData));
+            var response = await HttpHelper.PostAsync(httpClient, _baseTokenUri, postParams);
+
+            return JsonConvert.DeserializeObject<Token>(await response.Content.ReadAsStringAsync());
         }
 
         private async Task ValidateToken()
@@ -79,68 +82,53 @@ namespace EsiLibrary
 
         private string GetAuthorizationUri(string clientId, string redirectUri, IEnumerable<string> scopes, string state)
         {
-            var random = GenerateRandomString();
+            var randomByteData = GenerateRandomString();
 
-            var firstEncodedString = EncodeString(random);
+            var originalEncodedString = EncodeString(randomByteData);
+            
+            var codeChallenge = EncodeString(HashString(originalEncodedString));
 
-            var scopeDelimitedString = GetScopeDelimitedString(scopes);
-            var codeChallenge = EncodeString(HashString(firstEncodedString));
-
-            _originalEncodedString = firstEncodedString;
+            _originalEncodedString = originalEncodedString;
 
             var authorizationUri =
                 $"{_baseAuthorizationUri}?" +
                 $"response_type=code&" +
-                $"redirect_uri={EncodeUri(redirectUri)}&" +
+                $"redirect_uri={HttpUtility.UrlEncode(redirectUri)}&" +
                 $"client_id={clientId}&" +
-                $"scope={scopeDelimitedString}&" +
+                $"scope={string.Join("%20", scopes)}&" +
                 $"code_challenge={codeChallenge}&" +
                 $"code_challenge_method=S256&" +
                 $"state={state}/";
-            
+
             return authorizationUri;
         }
-
-        private string EncodeUri(string redirectUri)
+        
+        private byte[] GenerateRandomString(int length = 32)
         {
-            return HttpUtility.UrlEncode(redirectUri);
-        }
-
-        private string GetScopeDelimitedString(IEnumerable<string> scopes)
-        {
-            return string.Join("%20", scopes);
-        }
-
-        private string GenerateRandomString(int length = 32)
-        {
-            const string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
             var random = new Random();
 
-            return new string(Enumerable.Repeat(chars, length).Select(x => x[random.Next(x.Length)]).ToArray());
+            byte[] cc = new byte[length];
+
+            random.NextBytes(cc);
+
+            return cc;
         }
 
-        private string EncodeString(string unencodedString)
+        private string EncodeString(byte[] data)
         {
-            var bytes = Encoding.UTF8.GetBytes(unencodedString);
-            
-            return HttpServerUtility.UrlTokenEncode(bytes);
+            return Convert.ToBase64String(data).Replace('+', '-').Replace('/', '_').Replace("=","");
         }
 
-        private string HashString(string unhashedString)
+        private byte[] HashString(string unhashedString)
         {
-            var stringBuilder = new StringBuilder();
+            byte[] hash;
 
-            using (var hash = SHA256.Create())
+            using (var sha = new SHA256Managed())
             {
-                var bytes = hash.ComputeHash(Encoding.UTF8.GetBytes(unhashedString));
-
-                foreach (byte b in bytes)
-                {
-                    stringBuilder.Append(b.ToString("x2"));
-                }
+                hash = sha.ComputeHash(Encoding.ASCII.GetBytes(unhashedString));
             }
-
-            return stringBuilder.ToString();
+        
+            return hash;
         }
 
         private string ExtractAuthorizationCode(string responseCode, string redirectUri, string state)
